@@ -17,23 +17,40 @@ module systolic_array #(
 
     logic signed [DATA_W-1:0] a_flow [0:N][0:N];     // A dataflow: [row][col]
     logic signed [DATA_W-1:0] b_flow [0:N][0:N];     // B dataflow: [row][col]
-    logic [0:N]               valid_flow [0:N];       // Valid signal pipeline
+    logic [0:N]               valid_flow [0:N];      // Valid at col 0 and after row pipeline
+    logic                     valid_row_pipe [0:N-1][0:N-1];
 
     genvar i, j;
     generate
         for (i = 0; i < N; i++) begin : row
             assign a_flow[i][0] = i_a[i];
             assign b_flow[i][0] = i_b[i];
-            assign valid_flow[i][0] = (i == 0) ? i_valid : valid_flow[i-1][N];
+            if (i == 0)
+                assign valid_flow[i][0] = i_valid;
+            else
+                assign valid_flow[i][0] = valid_flow[i-1][N];
 
             for (j = 0; j < N; j++) begin : col
+                if (j == 0) begin : g_vpipe0
+                    always_ff @(posedge i_clk or negedge i_rst_n)
+                        if (!i_rst_n)
+                            valid_row_pipe[i][0] <= 1'b0;
+                        else
+                            valid_row_pipe[i][0] <= valid_flow[i][0];
+                end else begin : g_vpipe
+                    always_ff @(posedge i_clk or negedge i_rst_n)
+                        if (!i_rst_n)
+                            valid_row_pipe[i][j] <= 1'b0;
+                        else
+                            valid_row_pipe[i][j] <= valid_row_pipe[i][j-1];
+                end
                 mac_pe #(
                     .DATA_W(DATA_W),
                     .ACC_W(ACC_W)
                 ) pe (
                     .i_clk(i_clk),
                     .i_rst_n(i_rst_n),
-                    .i_valid(valid_flow[i][j]),
+                    .i_valid(valid_flow[i][0]),
                     .i_a(a_flow[i][j]),
                     .i_b(b_flow[i][j]),
                     .o_a(a_flow[i][j+1]),
@@ -42,7 +59,8 @@ module systolic_array #(
                 );
             end
 
-            assign o_valid[i] = valid_flow[i][N];
+            assign valid_flow[i][N] = valid_row_pipe[i][N-1];
+            assign o_valid[i]     = valid_flow[i][N];
         end
     endgenerate
 
