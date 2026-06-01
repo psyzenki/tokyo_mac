@@ -15,10 +15,10 @@ module systolic_array #(
     output logic [0:N-1]              o_valid         // Valid signal per row (pipelined)
 );
 
-    logic signed [DATA_W-1:0] a_flow [0:N][0:N];     // A dataflow: [row][col]
-    logic signed [DATA_W-1:0] b_flow [0:N][0:N];     // B dataflow: [row][col]
-    logic [0:N]               valid_flow [0:N];      // Valid at col 0 and after row pipeline
-    logic                     valid_row_pipe [0:N-1][0:N-1];
+    logic signed [DATA_W-1:0] a_flow [0:N-1][0:N];     // A dataflow: [row][col]
+    logic signed [DATA_W-1:0] b_flow [0:N-1][0:N];     // B dataflow: [row][col]
+    logic                     valid_in  [0:N-1];       // per-row valid at col 0
+    logic                     valid_pipe [0:N-1][0:N-1]; // valid delayed with data across cols
 
     genvar i, j;
     generate
@@ -26,31 +26,26 @@ module systolic_array #(
             assign a_flow[i][0] = i_a[i];
             assign b_flow[i][0] = i_b[i];
             if (i == 0)
-                assign valid_flow[i][0] = i_valid;
+                assign valid_in[i] = i_valid;
             else
-                assign valid_flow[i][0] = valid_flow[i-1][N];
+                assign valid_in[i] = valid_pipe[i-1][N-1];
 
             for (j = 0; j < N; j++) begin : col
-                if (j == 0) begin : g_vpipe0
-                    always_ff @(posedge i_clk or negedge i_rst_n)
-                        if (!i_rst_n)
-                            valid_row_pipe[i][0] <= 1'b0;
-                        else
-                            valid_row_pipe[i][0] <= valid_flow[i][0];
-                end else begin : g_vpipe
-                    always_ff @(posedge i_clk or negedge i_rst_n)
-                        if (!i_rst_n)
-                            valid_row_pipe[i][j] <= 1'b0;
-                        else
-                            valid_row_pipe[i][j] <= valid_row_pipe[i][j-1];
-                end
+                always_ff @(posedge i_clk or negedge i_rst_n)
+                    if (!i_rst_n)
+                        valid_pipe[i][j] <= 1'b0;
+                    else if (j == 0)
+                        valid_pipe[i][j] <= valid_in[i];
+                    else
+                        valid_pipe[i][j] <= valid_pipe[i][j-1];
+
                 mac_pe #(
                     .DATA_W(DATA_W),
                     .ACC_W(ACC_W)
                 ) pe (
                     .i_clk(i_clk),
                     .i_rst_n(i_rst_n),
-                    .i_valid(valid_flow[i][0]),
+                    .i_valid(valid_pipe[i][j]),
                     .i_a(a_flow[i][j]),
                     .i_b(b_flow[i][j]),
                     .o_a(a_flow[i][j+1]),
@@ -59,8 +54,7 @@ module systolic_array #(
                 );
             end
 
-            assign valid_flow[i][N] = valid_row_pipe[i][N-1];
-            assign o_valid[i]     = valid_flow[i][N];
+            assign o_valid[i] = valid_pipe[i][N-1];
         end
     endgenerate
 

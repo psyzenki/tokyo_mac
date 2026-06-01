@@ -15,7 +15,7 @@ VVP_ARRAY := $(BUILD_DIR)/systolic_array_tb_N%0d.vvp
 VVP_UART := $(BUILD_DIR)/uart_tb.vvp
 TB_UART  := tb/uart_tb.sv
 VVP_TOP  := $(BUILD_DIR)/tokyo_mac_top_tb.vvp
-TB_TOP   := tb/tokyo_mac_sys_tb.sv
+TB_TOP   := tb/tokyo_mac_top_tb.sv
 
 .PHONY: all test test-pe test-array test-uart test-top test-sizes clean
 
@@ -30,7 +30,7 @@ test-uart: $(VVP_UART)
 	$(VVP) $(VVP_UART)
 
 test-top: $(VVP_TOP)
-	$(VVP) $(VVP_TOP)
+	@out=$$($(VVP) $(VVP_TOP) 2>&1); echo "$$out"; echo "$$out" | grep -q "tokyo_mac_top_tb PASSED"
 
 # Default array sizes; override with ARRAY_SIZES="2 3 5"
 ARRAY_SIZES ?= 2 3 4 8

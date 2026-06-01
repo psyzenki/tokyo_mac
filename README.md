@@ -10,7 +10,7 @@ Requires [Icarus Verilog](http://iverilog.icarus.com/).
 make test          # mac_pe + uart + systolic array at N=2,3,4,8
 make test-pe       # mac_pe only
 make test-uart     # uart loopback smoke test
-make test-top      # uart + systolic top protocol smoke test
+make test-top      # full top: UART serial + host protocol + array readback
 make test-array    # systolic array only (all default sizes)
 ARRAY_SIZES="2 4 16" make test-array   # custom sizes
 ```
@@ -19,9 +19,11 @@ ARRAY_SIZES="2 4 16" make test-array   # custom sizes
 
 | File | Purpose |
 |------|---------|
-| `tb/mac_pe_tb.sv` | Unit tests: single MAC, accumulation, valid gating, INT8 extremes |
-| `tb/systolic_array_tb.sv` | Array tests: input MAC at PE(0,0), output MAC (`o_sum`) vs golden model, one-hot rows, uniform streams, checkerboard, random bursts, edge values |
+| `tb/mac_pe_tb.sv` | Unit tests: single MAC, accumulation, valid gating, INT8 extremes | VERFIFED OK
+| `tb/systolic_array_tb.sv` | Array tests: input MAC at PE(0,0), output MAC (`o_sum`) vs golden model, one-hot rows, uniform streams, checkerboard, random bursts, edge values | VERIFIED OK
 | `tb/systolic_ref_model.sv` | Structural golden (second `systolic_array` instance for scoreboarding) |
+| `tb/tokyo_mac_top_tb.sv` | End-to-end top: UART BFM + full host protocol + array readback |
+| `tb/tokyo_mac_sys_tb.sv` | Fast byte-level protocol test (bypasses UART) |
 | `tb/uart_tb.sv` | UART TX→RX loopback smoke test |
 
 Compile-time array size: `-DARRAY_N=<N>` via `tb/systolic_array_top.sv`.

@@ -37,43 +37,41 @@ module uart #(
     // -------------------------------------------------------------------------
     // RX: synchronize line, oversample start, sample data near bit center
     // -------------------------------------------------------------------------
-    logic       rx_sync_q, rx_sync;
-    logic       rx_line;
+    logic       rx_sync_q_reg;
+    logic       rx_line_reg;
     uart_state_t rx_state;
     logic [BIT_CNT_W-1:0] rx_bit_cnt;
-    logic [3:0]           rx_bit_idx;
-    logic [DATA_BITS-1:0] rx_shift;
-    logic [DATA_BITS-1:0] rx_hold;
-    logic                 rx_hold_valid;
+    logic [3:0]           rx_bit_idx_reg;
+    logic [DATA_BITS-1:0] rx_shift_reg;
+    logic [DATA_BITS-1:0] rx_hold_reg;
+    logic                 rx_hold_valid_reg;
 
     always_ff @(posedge i_clk or negedge i_rst_n) begin
         if (!i_rst_n) begin
-            rx_sync_q <= 1'b1;
-            rx_sync   <= 1'b1;
+            rx_sync_q_reg <= 1'b1;
+            rx_line_reg   <= 1'b1;
         end else begin
-            rx_sync_q <= i_rx;
-            rx_sync   <= rx_sync_q;
+            rx_sync_q_reg <= i_rx;
+            rx_line_reg   <= rx_sync_q_reg;
         end
     end
 
-    assign rx_line = rx_sync;
-
     always_ff @(posedge i_clk or negedge i_rst_n) begin
         if (!i_rst_n) begin
-            rx_state      <= ST_IDLE;
-            rx_bit_cnt    <= '0;
-            rx_bit_idx    <= '0;
-            rx_shift      <= '0;
-            rx_hold       <= '0;
-            rx_hold_valid <= 1'b0;
+            rx_state          <= ST_IDLE;
+            rx_bit_cnt        <= '0;
+            rx_bit_idx_reg    <= '0;
+            rx_shift_reg      <= '0;
+            rx_hold_reg       <= '0;
+            rx_hold_valid_reg <= 1'b0;
         end else begin
             if (o_rx_valid && i_rx_ready)
-                rx_hold_valid <= 1'b0;
+                rx_hold_valid_reg <= 1'b0;
 
             unique case (rx_state)
                 ST_IDLE: begin
                     rx_bit_cnt <= '0;
-                    if (rx_line == 1'b0) begin
+                    if (rx_line_reg == 1'b0) begin
                         rx_state   <= ST_START;
                         rx_bit_cnt <= BIT_CNT_W'((BIT_DIV / 2) - 1);
                     end
@@ -81,9 +79,9 @@ module uart #(
 
                 ST_START: begin
                     if (rx_bit_cnt == '0) begin
-                        if (rx_line == 1'b0) begin
+                        if (rx_line_reg == 1'b0) begin
                             rx_state   <= ST_DATA;
-                            rx_bit_idx <= '0;
+                            rx_bit_idx_reg <= '0;
                             rx_bit_cnt <= BIT_CNT_W'(BIT_DIV - 1);
                         end else
                             rx_state <= ST_IDLE;
@@ -93,12 +91,12 @@ module uart #(
 
                 ST_DATA: begin
                     if (rx_bit_cnt == '0) begin
-                        rx_shift[rx_bit_idx] <= rx_line;
-                        if (rx_bit_idx == DATA_BITS - 1) begin
+                        rx_shift_reg[rx_bit_idx_reg] <= rx_line_reg;
+                        if (rx_bit_idx_reg == DATA_BITS - 1) begin
                             rx_state   <= ST_STOP;
                             rx_bit_cnt <= BIT_CNT_W'(BIT_DIV - 1);
                         end else begin
-                            rx_bit_idx <= rx_bit_idx + 1'b1;
+                            rx_bit_idx_reg <= rx_bit_idx_reg + 1'b1;
                             rx_bit_cnt <= BIT_CNT_W'(BIT_DIV - 1);
                         end
                     end else
@@ -107,10 +105,10 @@ module uart #(
 
                 ST_STOP: begin
                     if (rx_bit_cnt == '0) begin
-                        if (rx_line == 1'b1) begin
-                            if (!rx_hold_valid) begin
-                                rx_hold       <= rx_shift;
-                                rx_hold_valid <= 1'b1;
+                        if (rx_line_reg == 1'b1) begin
+                            if (!rx_hold_valid_reg) begin
+                                rx_hold_reg       <= rx_shift_reg;
+                                rx_hold_valid_reg <= 1'b1;
                             end
                         end
                         rx_state <= ST_IDLE;
@@ -123,75 +121,75 @@ module uart #(
         end
     end
 
-    assign o_rx_valid = rx_hold_valid;
-    assign o_rx_data  = rx_hold;
+    assign o_rx_valid = rx_hold_valid_reg;
+    assign o_rx_data  = rx_hold_reg;
 
     // -------------------------------------------------------------------------
     // TX: idle high; shift start (0), data LSB-first, stop (1)
     // -------------------------------------------------------------------------
-    logic       tx_line;
+    logic       tx_line_reg;
     uart_state_t tx_state;
     logic [BIT_CNT_W-1:0] tx_bit_cnt;
-    logic [3:0]           tx_bit_idx;
-    logic [DATA_BITS-1:0] tx_shift;
-    logic                 tx_busy;
+    logic [3:0]           tx_bit_idx_reg;
+    logic [DATA_BITS-1:0] tx_shift_reg;
+    logic                 tx_busy_reg;
 
-    assign o_tx_ready = !tx_busy;
-    assign o_tx       = tx_line;
+    assign o_tx_ready = !tx_busy_reg;
+    assign o_tx       = tx_line_reg;
 
     always_ff @(posedge i_clk or negedge i_rst_n) begin
         if (!i_rst_n) begin
-            tx_line    <= 1'b1;
-            tx_state   <= ST_IDLE;
-            tx_bit_cnt <= '0;
-            tx_bit_idx <= '0;
-            tx_shift   <= '0;
-            tx_busy    <= 1'b0;
+            tx_line_reg    <= 1'b1;
+            tx_state       <= ST_IDLE;
+            tx_bit_cnt     <= '0;
+            tx_bit_idx_reg <= '0;
+            tx_shift_reg   <= '0;
+            tx_busy_reg    <= 1'b0;
         end else begin
             unique case (tx_state)
                 ST_IDLE: begin
-                    tx_line <= 1'b1;
-                    if (i_tx_valid && o_tx_ready) begin
-                        tx_shift   <= i_tx_data;
-                        tx_busy    <= 1'b1;
-                        tx_state   <= ST_START;
-                        tx_line    <= 1'b0;
-                        tx_bit_cnt <= BIT_CNT_W'(BIT_DIV - 1);
-                    end
+                    if (i_tx_valid && !tx_busy_reg) begin
+                        tx_shift_reg   <= i_tx_data;
+                        tx_busy_reg    <= 1'b1;
+                        tx_state       <= ST_START;
+                        tx_bit_cnt     <= BIT_CNT_W'(BIT_DIV - 1);
+                    end else
+                        tx_line_reg <= 1'b1;
                 end
 
                 ST_START: begin
+                    tx_line_reg <= 1'b0;
                     if (tx_bit_cnt == '0) begin
-                        tx_state   <= ST_DATA;
-                        tx_bit_idx <= '0;
-                        tx_line    <= tx_shift[0];
-                        tx_bit_cnt <= BIT_CNT_W'(BIT_DIV - 1);
+                        tx_state       <= ST_DATA;
+                        tx_bit_idx_reg <= '0;
+                        tx_line_reg    <= tx_shift_reg[0];
+                        tx_bit_cnt     <= BIT_CNT_W'(BIT_DIV - 1);
                     end else
                         tx_bit_cnt <= tx_bit_cnt - 1'b1;
                 end
 
                 ST_DATA: begin
                     if (tx_bit_cnt == '0) begin
-                        if (tx_bit_idx == DATA_BITS - 1) begin
-                            tx_state   <= ST_STOP;
-                            tx_line    <= 1'b1;
-                            tx_bit_cnt <= BIT_CNT_W'(BIT_DIV - 1);
+                        if (tx_bit_idx_reg == DATA_BITS - 1) begin
+                            tx_state       <= ST_STOP;
+                            tx_line_reg    <= 1'b1;
+                            tx_bit_cnt     <= BIT_CNT_W'(BIT_DIV - 1);
                         end else begin
-                            tx_bit_idx <= tx_bit_idx + 1'b1;
-                            tx_line    <= tx_shift[tx_bit_idx + 1'b1];
-                            tx_bit_cnt <= BIT_CNT_W'(BIT_DIV - 1);
+                            tx_bit_idx_reg <= tx_bit_idx_reg + 1'b1;
+                            tx_line_reg    <= tx_shift_reg[tx_bit_idx_reg + 1'b1];
+                            tx_bit_cnt     <= BIT_CNT_W'(BIT_DIV - 1);
                         end
                     end else
                         tx_bit_cnt <= tx_bit_cnt - 1'b1;
                 end
 
                 ST_STOP: begin
-                    tx_line <= 1'b1;
+                    tx_line_reg <= 1'b1;
                     if (tx_bit_cnt == '0) begin
-                        tx_busy  <= 1'b0;
-                        tx_state <= ST_IDLE;
+                        tx_busy_reg  <= 1'b0;
+                        tx_state     <= ST_IDLE;
                     end else
-                        tx_bit_cnt <= tx_bit_cnt - 1'b1;
+                        tx_bit_cnt   <= tx_bit_cnt - 1'b1;
                 end
 
                 default: tx_state <= ST_IDLE;

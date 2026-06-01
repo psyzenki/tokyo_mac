@@ -10,18 +10,18 @@ module uart_host_if #(
     parameter int DATA_W  = 8,
     parameter int ACC_W   = 32
 )(
-    input  logic                  i_clk,
-    input  logic                  i_rst_n,
+    input  logic                     i_clk,
+    input  logic                     i_rst_n,
 
-    output logic                  o_tx_valid,
-    output logic [7:0]            o_tx_data,
-    input  logic                  i_tx_ready,
+    output logic                     o_tx_valid,
+    output logic [7:0]               o_tx_data,
+    input  logic                     i_tx_ready,
 
-    input  logic                  i_rx_valid,
-    input  logic [7:0]            i_rx_data,
-    output logic                  o_rx_ready,
+    input  logic                     i_rx_valid,
+    input  logic [7:0]               i_rx_data,
+    output logic                     o_rx_ready,
 
-    output logic                  o_array_valid,
+    output logic                     o_array_valid,
     output logic signed [DATA_W-1:0] o_a [0:N-1],
     output logic signed [DATA_W-1:0] o_b [0:N-1],
 
