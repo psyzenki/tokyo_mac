@@ -7,6 +7,9 @@ build/
 __pycache__/
 *.pyc
 
+# xsim scratch dir
+sim_xsim/
+
 # Vivado runtime files
 *.log
 *.jou

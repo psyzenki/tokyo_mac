@@ -200,6 +200,27 @@ module systolic_array_tb #(
             apply_inputs(0);
         check_output_mac("random_burst");
 
+        // directed outer product: held vectors, k valid cycles ->
+        // o_sum[i][j] == k * a[i] * b[j] (checks intent, not just the golden copy)
+        reset_dut;
+        for (idx_i = 0; idx_i < N; idx_i = idx_i + 1) begin
+            a_vec[idx_i] = 8'sd2 + idx_i;
+            b_vec[idx_i] = (idx_i % 2) ? -8'sd3 - idx_i : 8'sd3 + idx_i;
+        end
+        for (idx_c = 0; idx_c < 3; idx_c = idx_c + 1)
+            apply_inputs(1'b1);
+        for (idx_c = 0; idx_c < 2 * N + 4; idx_c = idx_c + 1)
+            apply_inputs(0);
+        for (idx_i = 0; idx_i < N; idx_i = idx_i + 1)
+            for (idx_j = 0; idx_j < N; idx_j = idx_j + 1)
+                if (o_sum[idx_i][idx_j] !== 3 * a_vec[idx_i] * b_vec[idx_j]) begin
+                    $error("[outer_product] PE(%0d,%0d) exp=%0d got=%0d",
+                           idx_i, idx_j, 3 * a_vec[idx_i] * b_vec[idx_j],
+                           o_sum[idx_i][idx_j]);
+                    fail_cnt = fail_cnt + 1;
+                end else
+                    pass_cnt = pass_cnt + 1;
+
         $display("=== systolic_array_tb N=%0d done: %0d passed, %0d failed ===",
                  N, pass_cnt, fail_cnt);
         if (fail_cnt != 0)
