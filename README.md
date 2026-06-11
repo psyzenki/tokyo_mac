@@ -55,6 +55,35 @@ Connects `uart` → `uart_host_if` → `systolic_array`. Pins: `i_clk`, `i_rst_n
 
 Invalid opcode or bad index → `0xFF`. `SET_A` / `SET_B` update held inputs; `RUN` MACs using held `A` and `B`.
 
+## Cmod A7 (Artix-7) build
+
+Board files live in `fpga/cmod_a7/`: `cmod_a7_top.sv` (12 MHz clock, BTN0 reset,
+on-board FTDI USB-UART, LED0 heartbeat), `cmod_a7.xdc`, and Vivado batch scripts.
+
+```bash
+cd fpga/cmod_a7
+vivado -mode batch -source build.tcl                          # A7-35T, N=4
+vivado -mode batch -source build.tcl -tclargs xc7a15tcpg236-1 # A7-15T
+vivado -mode batch -source build.tcl -tclargs xc7a35tcpg236-1 8  # N=8
+vivado -mode batch -source program.tcl                        # program over JTAG
+```
+
+Outputs land in `fpga/cmod_a7/out/` (bitstream + timing/utilization reports).
+JTAG programming is volatile (re-program after power cycle). No external serial
+adapter is needed — the Cmod A7's USB connector exposes the UART as a COM port.
+**BTN0** resets the core and zeroes the accumulators; **LED0** blinks (~0.7 Hz)
+when the bitstream is alive.
+
+## Web frontend
+
+```bash
+python frontend/server.py        # opens http://localhost:8765
+```
+
+Pick the board's COM port (FTDI), connect, edit the A/B vectors, and run —
+the N×N accumulator matrix is read back and shown as a heatmap. Uses only
+pyserial + the Python standard library.
+
 ## FPGA + PC host
 
 ### Hardware

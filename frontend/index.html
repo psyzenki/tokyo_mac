@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tokyo_mac console</title>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #181c26; --panel2: #1f2433; --line: #2c3347;
+    --fg: #e6e9f0; --dim: #8b93a7; --accent: #4f8cff; --ok: #3ecf8e; --err: #ff5d5d;
+    --pos: 79, 140, 255; --neg: 255, 93, 93;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg); min-height: 100vh;
+    font: 15px/1.5 "Segoe UI", system-ui, sans-serif; display: flex; flex-direction: column; align-items: center;
+  }
+  header {
+    width: 100%; padding: 18px 28px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: baseline; gap: 14px;
+  }
+  header h1 { margin: 0; font-size: 20px; letter-spacing: .04em; }
+  header h1 span { color: var(--accent); }
+  header .sub { color: var(--dim); font-size: 13px; }
+  main { width: 100%; max-width: 980px; padding: 22px 24px 60px; display: flex; flex-direction: column; gap: 18px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+  .card h2 { margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: .1em; color: var(--dim); }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  select, input[type=number] {
+    background: var(--panel2); color: var(--fg); border: 1px solid var(--line);
+    border-radius: 6px; padding: 7px 10px; font: inherit;
+  }
+  select { min-width: 280px; }
+  input.cell { width: 64px; text-align: center; }
+  button {
+    background: var(--panel2); color: var(--fg); border: 1px solid var(--line);
+    border-radius: 6px; padding: 7px 16px; font: inherit; cursor: pointer; transition: .15s;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.primary:hover:not(:disabled) { filter: brightness(1.12); color: #fff; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px; border-radius: 999px;
+    font-size: 13px; border: 1px solid var(--line); color: var(--dim);
+  }
+  .chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--dim); }
+  .chip.on { color: var(--ok); border-color: var(--ok); }
+  .chip.on::before { background: var(--ok); }
+  .veclabel { width: 110px; color: var(--dim); font-size: 13px; }
+  .veclabel b { color: var(--fg); font-size: 15px; }
+  #grid { border-collapse: separate; border-spacing: 6px; margin: 4px auto; }
+  #grid td {
+    min-width: 86px; height: 56px; text-align: center; border-radius: 8px;
+    background: var(--panel2); border: 1px solid var(--line); font-variant-numeric: tabular-nums;
+    font-size: 16px; transition: background .25s;
+  }
+  #grid .hdr { background: none; border: none; color: var(--dim); font-size: 12px; height: auto; min-width: 0; }
+  #log {
+    font: 12.5px/1.6 Consolas, monospace; color: var(--dim); background: var(--panel2);
+    border-radius: 6px; padding: 10px 12px; max-height: 150px; overflow-y: auto; white-space: pre-wrap;
+  }
+  #log .e { color: var(--err); }
+  #log .o { color: var(--ok); }
+  .hint { color: var(--dim); font-size: 12.5px; margin-top: 8px; }
+  .spacer { flex: 1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>tokyo_<span>mac</span></h1>
+  <div class="sub">systolic MAC array &middot; Cmod A7</div>
+  <div class="spacer" style="flex:1"></div>
+  <span id="chip" class="chip">disconnected</span>
+</header>
+<main>
+
+  <div class="card">
+    <h2>Connection</h2>
+    <div class="row">
+      <select id="port"></select>
+      <button id="refresh" title="rescan serial ports">&#x21bb;</button>
+      <button id="connect" class="primary">Connect</button>
+      <button id="ping" disabled>Ping</button>
+      <span id="devinfo" class="hint"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Inputs</h2>
+    <div class="row" style="margin-bottom:8px"><span class="veclabel">Vector <b>A</b> (int8)</span><span id="veca" class="row"></span></div>
+    <div class="row"><span class="veclabel">Vector <b>B</b> (int8)</span><span id="vecb" class="row"></span></div>
+    <div class="row" style="margin-top:14px">
+      <span class="veclabel">RUN cycles</span>
+      <input id="count" class="cell" type="number" min="1" max="255" value="1">
+      <button id="go" class="primary" disabled>Load A/B + Run</button>
+      <button id="again" disabled title="pulse RUN again with the held A/B">Run again</button>
+      <button id="read" disabled title="read accumulators without running">Read</button>
+      <button id="rand" disabled>Randomize</button>
+    </div>
+    <div class="hint">Accumulators only clear on hardware reset &mdash; press <b>BTN0</b> on the Cmod A7 to zero them.</div>
+  </div>
+
+  <div class="card">
+    <h2>Accumulators &middot; o_sum[row][col]</h2>
+    <table id="grid"></table>
+  </div>
+
+  <div class="card">
+    <h2>Log</h2>
+    <div id="log"></div>
+  </div>
+
+</main>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+let N = 4, connected = false;
+
+function log(msg, cls) {
+  const d = $("log");
+  const line = document.createElement("div");
+  if (cls) line.className = cls;
+  line.textContent = `${new Date().toLocaleTimeString()}  ${msg}`;
+  d.prepend(line);
+}
+
+async function api(path, body) {
+  const opts = body !== undefined
+    ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+    : {};
+  const r = await fetch(path, opts);
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+function setConnected(on, info) {
+  connected = on;
+  $("chip").className = "chip" + (on ? " on" : "");
+  $("chip").textContent = on ? `connected ${info.port}` : "disconnected";
+  $("connect").textContent = on ? "Disconnect" : "Connect";
+  $("devinfo").textContent = on ? `N=${info.n}  DATA_W=${info.data_w}  ACC_W=${info.acc_w}  @${info.baud} baud` : "";
+  for (const id of ["ping", "go", "again", "read", "rand"]) $(id).disabled = !on;
+  if (on && info.n !== N) { N = info.n; buildVectors(); buildGrid(); }
+}
+
+function buildVectors() {
+  for (const id of ["veca", "vecb"]) {
+    const span = $(id);
+    span.innerHTML = "";
+    for (let i = 0; i < N; i++) {
+      const inp = document.createElement("input");
+      inp.type = "number"; inp.min = -128; inp.max = 127; inp.className = "cell";
+      inp.value = id === "veca" ? i + 1 : 2;
+      span.appendChild(inp);
+    }
+  }
+}
+
+function buildGrid() {
+  const t = $("grid");
+  t.innerHTML = "";
+  const top = t.insertRow();
+  top.insertCell().className = "hdr";
+  for (let c = 0; c < N; c++) { const h = top.insertCell(); h.className = "hdr"; h.textContent = `col ${c}`; }
+  for (let r = 0; r < N; r++) {
+    const row = t.insertRow();
+    const h = row.insertCell(); h.className = "hdr"; h.textContent = `row ${r}`;
+    for (let c = 0; c < N; c++) { row.insertCell().id = `s${r}_${c}`; row.cells[c + 1].textContent = "–"; }
+  }
+}
+
+function showMatrix(m) {
+  let max = 1;
+  for (const row of m) for (const v of row) max = Math.max(max, Math.abs(v));
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    const v = m[r][c], cell = $(`s${r}_${c}`);
+    cell.textContent = v;
+    const t = Math.abs(v) / max;
+    cell.style.background = v === 0 ? "" :
+      `rgba(${v > 0 ? getComputedStyle(document.documentElement).getPropertyValue("--pos") : getComputedStyle(document.documentElement).getPropertyValue("--neg")}, ${0.12 + 0.5 * t})`;
+  }
+}
+
+function vec(id) {
+  return [...$(id).querySelectorAll("input")].map(i => {
+    const v = parseInt(i.value, 10);
+    if (Number.isNaN(v) || v < -128 || v > 127) throw new Error("vector values must be int8 (-128..127)");
+    return v;
+  });
+}
+
+async function refreshPorts() {
+  try {
+    const { ports } = await api("/api/ports");
+    const sel = $("port");
+    sel.innerHTML = "";
+    for (const p of ports) {
+      const o = document.createElement("option");
+      o.value = p.device;
+      o.textContent = `${p.device} — ${p.description}${p.ftdi ? "  [FTDI]" : ""}`;
+      sel.appendChild(o);
+    }
+    if (!ports.length) {
+      const o = document.createElement("option");
+      o.textContent = "(no serial ports found)"; o.value = "";
+      sel.appendChild(o);
+    }
+  } catch (e) { log(e.message, "e"); }
+}
+
+$("refresh").onclick = refreshPorts;
+
+$("connect").onclick = async () => {
+  try {
+    if (connected) {
+      await api("/api/disconnect", {});
+      setConnected(false, {});
+      log("disconnected");
+      return;
+    }
+    const port = $("port").value;
+    if (!port) throw new Error("no port selected");
+    const info = await api("/api/connect", { port, baud: 115200 });
+    setConnected(true, info);
+    log(`connected to ${port}: N=${info.n} DATA_W=${info.data_w} ACC_W=${info.acc_w}`, "o");
+  } catch (e) { log(e.message, "e"); }
+};
+
+$("ping").onclick = async () => {
+  try { const { pong } = await api("/api/ping", {}); log(pong ? "PONG (0x55)" : "no PONG", pong ? "o" : "e"); }
+  catch (e) { log(e.message, "e"); }
+};
+
+$("go").onclick = async () => {
+  try {
+    const a = vec("veca"), b = vec("vecb");
+    const count = Math.min(255, Math.max(1, parseInt($("count").value, 10) || 1));
+    const { sum } = await api("/api/mac", { a, b, count });
+    showMatrix(sum);
+    log(`SET_A [${a}]  SET_B [${b}]  RUN ${count} -> read back ${N}x${N}`, "o");
+  } catch (e) { log(e.message, "e"); }
+};
+
+$("again").onclick = async () => {
+  try {
+    const count = Math.min(255, Math.max(1, parseInt($("count").value, 10) || 1));
+    const { sum } = await api("/api/run", { count });
+    showMatrix(sum);
+    log(`RUN ${count} (held A/B)`, "o");
+  } catch (e) { log(e.message, "e"); }
+};
+
+$("read").onclick = async () => {
+  try { const { sum } = await api("/api/all"); showMatrix(sum); log("GET_ALL"); }
+  catch (e) { log(e.message, "e"); }
+};
+
+$("rand").onclick = () => {
+  for (const id of ["veca", "vecb"])
+    for (const i of $(id).querySelectorAll("input"))
+      i.value = Math.floor(Math.random() * 21) - 10;
+};
+
+(async () => {
+  buildVectors();
+  buildGrid();
+  await refreshPorts();
+  try {
+    const st = await api("/api/status");
+    if (st.connected) setConnected(true, st);
+  } catch {}
+  log("ready — select the Cmod A7 COM port and connect");
+})();
+</script>
+</body>
+</html>
