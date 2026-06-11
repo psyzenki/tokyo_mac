@@ -26,5 +26,8 @@ vivado_*.backup.*
 # FPGA build outputs (regenerate with fpga/cmod_a7/build.tcl)
 fpga/cmod_a7/out/
 
+# Generated Vivado GUI project (regenerate with create_project.tcl)
+fpga/cmod_a7/vivado_proj/
+
 # Claude Code local runtime
 .claude/*.lock
