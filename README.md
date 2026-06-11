@@ -69,11 +69,15 @@ vivado -mode batch -source build.tcl                          # A7-35T, N=4
 vivado -mode batch -source build.tcl -tclargs xc7a15tcpg236-1 # A7-15T
 vivado -mode batch -source build.tcl -tclargs xc7a35tcpg236-1 8  # N=8
 vivado -mode batch -source program.tcl                        # program over JTAG
+vivado -mode batch -source flash.tcl   # write QSPI flash: survives power cycles
+vivado -mode batch -source create_project.tcl  # generate vivado_proj/tokyo_mac.xpr (GUI)
 ```
 
 Outputs land in `fpga/cmod_a7/out/` (bitstream + timing/utilization reports).
-JTAG programming is volatile (re-program after power cycle). No external serial
-adapter is needed — the Cmod A7's USB connector exposes the UART as a COM port.
+JTAG programming (`program.tcl`) is volatile — re-program after a power cycle —
+while `flash.tcl` writes the on-board QSPI flash so the FPGA boots the design
+by itself at power-on. No external serial adapter is needed — the Cmod A7's
+USB connector exposes the UART as a COM port.
 **BTN0** resets the core and zeroes the accumulators; **LED0** blinks (~0.7 Hz)
 when the bitstream is alive.
 

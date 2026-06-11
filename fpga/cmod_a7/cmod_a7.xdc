@@ -26,3 +26,7 @@ set_false_path -to   [get_ports o_led0]
 set_property CFGBVS VCCO [current_design]
 set_property CONFIG_VOLTAGE 3.3 [current_design]
 set_property BITSTREAM.GENERAL.COMPRESS TRUE [current_design]
+
+## QSPI flash boot (MX25L3233F): x4 data width, 33 MHz config clock
+set_property BITSTREAM.CONFIG.SPI_BUSWIDTH 4 [current_design]
+set_property BITSTREAM.CONFIG.CONFIGRATE 33 [current_design]
