@@ -58,6 +58,7 @@ module uart_host_if #(
     logic [7:0]               tx_opc;
     logic [IDX_W-1:0]         idx_reg;
     logic [IDX_W-1:0]         row_reg;
+    logic [7:0]               row_byte_reg;
     logic [IDX_W-1:0]         col_reg;
     logic [7:0]               run_remain;
     logic signed [DATA_W-1:0] a_hold [0:N-1];
@@ -150,6 +151,7 @@ module uart_host_if #(
             tx_opc      <= 8'h00;
             idx_reg     <= '0;
             row_reg     <= '0;
+            row_byte_reg <= 8'h00;
             col_reg     <= '0;
             run_remain  <= 8'd0;
             tx_phase    <= 4'd0;
@@ -234,8 +236,9 @@ module uart_host_if #(
                 CMD_RECV_ROW: begin
                     o_rx_ready <= 1'b1;
                     if (i_rx_valid && o_rx_ready) begin
-                        row_reg   <= i_rx_data[IDX_W-1:0];
-                        cmd_state <= CMD_RECV_COL;
+                        row_reg      <= i_rx_data[IDX_W-1:0];
+                        row_byte_reg <= i_rx_data;
+                        cmd_state    <= CMD_RECV_COL;
                     end
                 end
 
@@ -245,7 +248,9 @@ module uart_host_if #(
                         col_reg <= i_rx_data[IDX_W-1:0];
                         tx_opc  <= OPC_GET_SUM;
                         tx_phase <= 4'd0;
-                        if (row_reg < IDX_W'(N) && i_rx_data[IDX_W-1:0] < IDX_W'(N)) begin
+                        // Bounds check on the raw bytes: IDX_W'(N) truncates to 0
+                        // when N is a power of two, so compare at full width.
+                        if (row_byte_reg < 8'(N) && i_rx_data < 8'(N)) begin
                             tx_err      <= 1'b0;
                             tx_sum_word <= i_sum[row_reg][i_rx_data[IDX_W-1:0]];
                         end else

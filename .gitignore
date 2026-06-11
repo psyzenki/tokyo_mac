@@ -1,1 +1,27 @@
+# Simulation build (Makefile / Icarus)
 build/
+*.vcd
+*.fst
+
+# Python
+__pycache__/
+*.pyc
+
+# Vivado runtime files
+*.log
+*.jou
+*.str
+.Xil/
+.cache/
+xsim.dir/
+clockInfo.txt
+dfx_runtime.txt
+webtalk*
+vivado_*.backup.*
+*.pb
+
+# FPGA build outputs (regenerate with fpga/cmod_a7/build.tcl)
+fpga/cmod_a7/out/
+
+# Claude Code local runtime
+.claude/*.lock
