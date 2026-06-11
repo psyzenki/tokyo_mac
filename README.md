@@ -47,13 +47,16 @@ Connects `uart` → `uart_host_if` → `systolic_array`. Pins: `i_clk`, `i_rst_n
 |--------|------|------------|----------------|
 | `0x01` | PING | — | `0x55` |
 | `0x02` | INFO | — | `N`, `DATA_W`, `ACC_W` |
-| `0x10` | SET_A | `N` × int8 (row vector) | `0x00` ACK |
-| `0x11` | SET_B | `N` × int8 | `0x00` ACK |
+| `0x10` | SET_A | `N` × int8 (one per array row) | `0x00` ACK |
+| `0x11` | SET_B | `N` × int8 (one per array column) | `0x00` ACK |
 | `0x12` | RUN | count (1–255, 0→1) | `0x00` ACK; asserts `i_valid` for count cycles |
 | `0x20` | GET_SUM | row, col | 4 bytes LE int32 |
 | `0x21` | GET_ALL | — | `N×N×4` bytes LE, row-major `o_sum` |
 
-Invalid opcode or bad index → `0xFF`. `SET_A` / `SET_B` update held inputs; `RUN` MACs using held `A` and `B`.
+Invalid opcode or bad index → `0xFF`. `SET_A` / `SET_B` update held inputs; `RUN k`
+pulses `i_valid` for `k` cycles, so each PE accumulates `k` MACs:
+`o_sum[i][j] += k * a[i] * b[j]` (outer-product accumulate; A flows left-to-right,
+B top-to-bottom).
 
 ## Cmod A7 (Artix-7) build
 

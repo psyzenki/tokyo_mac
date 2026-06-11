@@ -56,6 +56,9 @@
     font-size: 16px; transition: background .25s;
   }
   #grid .hdr { background: none; border: none; color: var(--dim); font-size: 12px; height: auto; min-width: 0; }
+  #grid .corner { font-style: italic; }
+  #grid .vec { background: none; border: 1px dashed var(--line); }
+  #grid .vec input { width: 100%; height: 100%; border: none; background: none; color: var(--accent); font-weight: 600; }
   #log {
     font: 12.5px/1.6 Consolas, monospace; color: var(--dim); background: var(--panel2);
     border-radius: 6px; padding: 10px 12px; max-height: 150px; overflow-y: auto; white-space: pre-wrap;
@@ -87,23 +90,20 @@
   </div>
 
   <div class="card">
-    <h2>Inputs</h2>
-    <div class="row" style="margin-bottom:8px"><span class="veclabel">Vector <b>A</b> (int8)</span><span id="veca" class="row"></span></div>
-    <div class="row"><span class="veclabel">Vector <b>B</b> (int8)</span><span id="vecb" class="row"></span></div>
-    <div class="row" style="margin-top:14px">
-      <span class="veclabel">RUN cycles</span>
+    <h2>Array &middot; o_sum[i][j] += a[i] &times; b[j]</h2>
+    <table id="grid"></table>
+    <div class="row" style="margin-top:14px; justify-content:center">
+      <span class="veclabel" style="width:auto">MAC repeats (RUN cycles)</span>
       <input id="count" class="cell" type="number" min="1" max="255" value="1">
       <button id="go" class="primary" disabled>Load A/B + Run</button>
       <button id="again" disabled title="pulse RUN again with the held A/B">Run again</button>
       <button id="read" disabled title="read accumulators without running">Read</button>
       <button id="rand" disabled>Randomize</button>
     </div>
-    <div class="hint">Accumulators only clear on hardware reset &mdash; press <b>BTN0</b> on the Cmod A7 to zero them.</div>
-  </div>
-
-  <div class="card">
-    <h2>Accumulators &middot; o_sum[row][col]</h2>
-    <table id="grid"></table>
+    <div class="hint" style="text-align:center">
+      <b>A</b> enters each row from the left, <b>B</b> enters each column from the top; PE(i,j) accumulates a[i]&times;b[j] per RUN cycle.
+      Accumulators only clear on hardware reset &mdash; press <b>BTN0</b> on the Cmod A7 to zero them.
+    </div>
   </div>
 
   <div class="card">
@@ -142,32 +142,41 @@ function setConnected(on, info) {
   $("connect").textContent = on ? "Disconnect" : "Connect";
   $("devinfo").textContent = on ? `N=${info.n}  DATA_W=${info.data_w}  ACC_W=${info.acc_w}  @${info.baud} baud` : "";
   for (const id of ["ping", "go", "again", "read", "rand"]) $(id).disabled = !on;
-  if (on && info.n !== N) { N = info.n; buildVectors(); buildGrid(); }
+  if (on && info.n !== N) { N = info.n; buildGrid(); }
 }
 
-function buildVectors() {
-  for (const id of ["veca", "vecb"]) {
-    const span = $(id);
-    span.innerHTML = "";
-    for (let i = 0; i < N; i++) {
-      const inp = document.createElement("input");
-      inp.type = "number"; inp.min = -128; inp.max = 127; inp.className = "cell";
-      inp.value = id === "veca" ? i + 1 : 2;
-      span.appendChild(inp);
-    }
-  }
+function mkInput(cls, val) {
+  const inp = document.createElement("input");
+  inp.type = "number"; inp.min = -128; inp.max = 127;
+  inp.className = `cell ${cls}`;
+  inp.value = val;
+  return inp;
 }
 
 function buildGrid() {
   const t = $("grid");
   t.innerHTML = "";
+  // top row: corner label + B inputs (one per column, entering from the top)
   const top = t.insertRow();
-  top.insertCell().className = "hdr";
-  for (let c = 0; c < N; c++) { const h = top.insertCell(); h.className = "hdr"; h.textContent = `col ${c}`; }
+  const corner = top.insertCell();
+  corner.className = "hdr corner";
+  corner.innerHTML = "a[i] &#92; b[j]";
+  for (let c = 0; c < N; c++) {
+    const h = top.insertCell();
+    h.className = "vec";
+    h.appendChild(mkInput("bin", 2));
+  }
+  // body rows: A input on the left + result cells
   for (let r = 0; r < N; r++) {
     const row = t.insertRow();
-    const h = row.insertCell(); h.className = "hdr"; h.textContent = `row ${r}`;
-    for (let c = 0; c < N; c++) { row.insertCell().id = `s${r}_${c}`; row.cells[c + 1].textContent = "–"; }
+    const h = row.insertCell();
+    h.className = "vec";
+    h.appendChild(mkInput("ain", r + 1));
+    for (let c = 0; c < N; c++) {
+      const cell = row.insertCell();
+      cell.id = `s${r}_${c}`;
+      cell.textContent = "–";
+    }
   }
 }
 
@@ -183,8 +192,8 @@ function showMatrix(m) {
   }
 }
 
-function vec(id) {
-  return [...$(id).querySelectorAll("input")].map(i => {
+function vec(cls) {
+  return [...document.querySelectorAll(`input.${cls}`)].map(i => {
     const v = parseInt(i.value, 10);
     if (Number.isNaN(v) || v < -128 || v > 127) throw new Error("vector values must be int8 (-128..127)");
     return v;
@@ -235,7 +244,7 @@ $("ping").onclick = async () => {
 
 $("go").onclick = async () => {
   try {
-    const a = vec("veca"), b = vec("vecb");
+    const a = vec("ain"), b = vec("bin");
     const count = Math.min(255, Math.max(1, parseInt($("count").value, 10) || 1));
     const { sum } = await api("/api/mac", { a, b, count });
     showMatrix(sum);
@@ -258,13 +267,11 @@ $("read").onclick = async () => {
 };
 
 $("rand").onclick = () => {
-  for (const id of ["veca", "vecb"])
-    for (const i of $(id).querySelectorAll("input"))
-      i.value = Math.floor(Math.random() * 21) - 10;
+  for (const i of document.querySelectorAll("input.ain, input.bin"))
+    i.value = Math.floor(Math.random() * 21) - 10;
 };
 
 (async () => {
-  buildVectors();
   buildGrid();
   await refreshPorts();
   try {
